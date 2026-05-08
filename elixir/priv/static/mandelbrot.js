@@ -5,24 +5,18 @@
     scale: 3.05
   };
   var DEFAULT_DETAIL = "192";
-  var INITIAL_SYNC_PIXEL_LIMIT = 700000;
-  var INITIAL_SYNC_ITERATION_LIMIT = 216;
-  var ROW_PIXEL_BUDGET = 260000;
+  var INITIAL_SYNC_PIXEL_LIMIT = 50000;
+  var INITIAL_SYNC_ITERATION_LIMIT = 128;
+  var ROW_PIXEL_BUDGET = 60000;
   var RESIZE_DEBOUNCE_MS = 120;
   var ZOOM_IN_FACTOR = 0.58;
   var ZOOM_OUT_FACTOR = 1.72;
   var CLICK_ZOOM_FACTOR = 0.78;
 
-  var paletteFns = {
-    aurora: function (t) {
-      return hslToRgb(180 + 130 * t, 72, 12 + 58 * Math.sqrt(t));
-    },
-    ember: function (t) {
-      return hslToRgb(18 + 58 * t, 84, 14 + 60 * Math.sqrt(t));
-    },
-    prism: function (t) {
-      return hslToRgb(270 + 250 * t, 80, 16 + 56 * Math.sqrt(t));
-    }
+  var palettes = {
+    aurora: { hue: 180, hueSpan: 130, saturation: 72, lightness: 12, lightnessSpan: 58 },
+    ember: { hue: 18, hueSpan: 58, saturation: 84, lightness: 14, lightnessSpan: 60 },
+    prism: { hue: 270, hueSpan: 250, saturation: 80, lightness: 16, lightnessSpan: 56 }
   };
 
   function initMandelbrot() {
@@ -31,7 +25,7 @@
 
     canvas.dataset.bound = "true";
 
-    var ctx = canvas.getContext("2d", { alpha: false });
+    var ctx = canvas.getContext("2d");
     var app = document.getElementById("mandelbrot-app");
     var paletteSelect = document.getElementById("palette-select");
     var detailRange = document.getElementById("detail-range");
@@ -107,8 +101,8 @@
       var rowsPerFrame =
         pixelCount <= INITIAL_SYNC_PIXEL_LIMIT && maxIterations <= INITIAL_SYNC_ITERATION_LIMIT
           ? height
-          : Math.max(4, Math.floor(ROW_PIXEL_BUDGET / width));
-      var palette = paletteFns[paletteSelect.value] || paletteFns.aurora;
+          : Math.max(2, Math.floor(ROW_PIXEL_BUDGET / width));
+      var palette = palettes[paletteSelect.value] || palettes.aurora;
 
       status.textContent = "Rendering";
 
@@ -122,13 +116,9 @@
 
           for (var col = 0; col < width; col += 1) {
             var cx = view.centerX + (col / width - 0.5) * scaleX;
-            var color = mandelbrotColor(cx, cy, maxIterations, palette);
             var offset = (row * width + col) * 4;
 
-            data[offset] = color[0];
-            data[offset + 1] = color[1];
-            data[offset + 2] = color[2];
-            data[offset + 3] = 255;
+            writeMandelbrotColor(data, offset, cx, cy, maxIterations, palette);
           }
         }
 
@@ -182,7 +172,7 @@
     scheduleRender();
   }
 
-  function mandelbrotColor(cx, cy, maxIterations, palette) {
+  function writeMandelbrotColor(data, offset, cx, cy, maxIterations, palette) {
     var zx = 0;
     var zy = 0;
     var xx = 0;
@@ -198,22 +188,24 @@
     }
 
     if (iteration === maxIterations) {
-      return [5, 7, 9];
+      data[offset] = 5;
+      data[offset + 1] = 7;
+      data[offset + 2] = 9;
+      data[offset + 3] = 255;
+      return;
     }
 
-    var smooth = iteration + 1 - Math.log(Math.log(Math.sqrt(xx + yy))) / Math.LN2;
+    var smooth = iteration + 2 - Math.log(Math.log(xx + yy)) / Math.LN2;
     var t = clamp(smooth / maxIterations, 0, 1);
-    var color = palette(t);
     var edge = Math.min(1, t * 8);
+    var sqrtT = Math.sqrt(t);
+    var hue = palette.hue + palette.hueSpan * t;
+    var lightness = palette.lightness + palette.lightnessSpan * sqrtT;
 
-    return [
-      Math.round(color[0] * edge),
-      Math.round(color[1] * edge),
-      Math.round(color[2] * edge)
-    ];
+    writeHslToRgb(data, offset, hue, palette.saturation, lightness, edge);
   }
 
-  function hslToRgb(h, s, l) {
+  function writeHslToRgb(data, offset, h, s, l, edge) {
     h = ((h % 360) + 360) % 360;
     s /= 100;
     l /= 100;
@@ -221,21 +213,35 @@
     var c = (1 - Math.abs(2 * l - 1)) * s;
     var hp = h / 60;
     var x = c * (1 - Math.abs((hp % 2) - 1));
-    var rgb = [0, 0, 0];
+    var r = 0;
+    var g = 0;
+    var b = 0;
 
-    if (hp < 1) rgb = [c, x, 0];
-    else if (hp < 2) rgb = [x, c, 0];
-    else if (hp < 3) rgb = [0, c, x];
-    else if (hp < 4) rgb = [0, x, c];
-    else if (hp < 5) rgb = [x, 0, c];
-    else rgb = [c, 0, x];
+    if (hp < 1) {
+      r = c;
+      g = x;
+    } else if (hp < 2) {
+      r = x;
+      g = c;
+    } else if (hp < 3) {
+      g = c;
+      b = x;
+    } else if (hp < 4) {
+      g = x;
+      b = c;
+    } else if (hp < 5) {
+      r = x;
+      b = c;
+    } else {
+      r = c;
+      b = x;
+    }
 
     var m = l - c / 2;
-    return [
-      Math.round((rgb[0] + m) * 255),
-      Math.round((rgb[1] + m) * 255),
-      Math.round((rgb[2] + m) * 255)
-    ];
+    data[offset] = Math.round((r + m) * 255 * edge);
+    data[offset + 1] = Math.round((g + m) * 255 * edge);
+    data[offset + 2] = Math.round((b + m) * 255 * edge);
+    data[offset + 3] = 255;
   }
 
   function clamp(value, min, max) {

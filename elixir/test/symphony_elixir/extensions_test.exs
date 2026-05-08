@@ -513,7 +513,7 @@ defmodule SymphonyElixir.ExtensionsTest do
     assert dashboard_css =~ "linear-gradient(90deg, var(--green), var(--gold), var(--rose), var(--violet))"
 
     mandelbrot_js = response(get(build_conn(), "/mandelbrot.js"), 200)
-    assert mandelbrot_js =~ "function mandelbrotColor"
+    assert mandelbrot_js =~ "function writeMandelbrotColor"
     assert mandelbrot_js =~ "requestAnimationFrame"
 
     mandelbrot_preview = response(get(build_conn(), "/mandelbrot-preview.png"), 200)
@@ -618,7 +618,7 @@ defmodule SymphonyElixir.ExtensionsTest do
 
     mandelbrot_js = Req.get!("http://127.0.0.1:#{port}/mandelbrot.js")
     assert mandelbrot_js.status == 200
-    assert mandelbrot_js.body =~ "mandelbrotColor"
+    assert mandelbrot_js.body =~ "writeMandelbrotColor"
 
     mandelbrot_preview = Req.get!("http://127.0.0.1:#{port}/mandelbrot-preview.png")
     assert mandelbrot_preview.status == 200

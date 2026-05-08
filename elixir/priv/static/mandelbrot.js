@@ -4,6 +4,14 @@
     centerY: 0,
     scale: 3.05
   };
+  var DEFAULT_DETAIL = "192";
+  var INITIAL_SYNC_PIXEL_LIMIT = 700000;
+  var INITIAL_SYNC_ITERATION_LIMIT = 216;
+  var ROW_PIXEL_BUDGET = 260000;
+  var RESIZE_DEBOUNCE_MS = 120;
+  var ZOOM_IN_FACTOR = 0.58;
+  var ZOOM_OUT_FACTOR = 1.72;
+  var CLICK_ZOOM_FACTOR = 0.78;
 
   var paletteFns = {
     aurora: function (t) {
@@ -33,7 +41,19 @@
     var status = document.getElementById("render-status");
     var resolution = document.getElementById("render-resolution");
 
-    if (!ctx || !app || !paletteSelect || !detailRange || !zoomIn || !zoomOut || !reset) return;
+    if (
+      !ctx ||
+      !app ||
+      !paletteSelect ||
+      !detailRange ||
+      !zoomIn ||
+      !zoomOut ||
+      !reset ||
+      !status ||
+      !resolution
+    ) {
+      return;
+    }
 
     var view = Object.assign({}, INITIAL_VIEW);
     var renderToken = 0;
@@ -60,7 +80,8 @@
       var viewportWidth = Math.max(window.innerWidth || rect.width, 320);
       var viewportHeight = Math.max(window.innerHeight || rect.height, 320);
       var maxCssWidth = Math.max(viewportWidth - 24, 320);
-      var maxCssHeight = viewportWidth <= 560 ? Math.max(viewportHeight * 0.36, 260) : viewportHeight;
+      var maxCssHeight =
+        viewportWidth <= 560 ? Math.max(viewportHeight * 0.36, 260) : viewportHeight;
       var cssWidth = Math.max(Math.floor(Math.min(rect.width, maxCssWidth)), 320);
       var cssHeight = Math.max(Math.floor(Math.min(rect.height, maxCssHeight)), 260);
       var ratio = Math.min(window.devicePixelRatio || 1, 1.5, 1400 / cssWidth, 920 / cssHeight);
@@ -84,7 +105,9 @@
       var row = 0;
       var pixelCount = width * height;
       var rowsPerFrame =
-        pixelCount <= 700000 && maxIterations <= 216 ? height : Math.max(4, Math.floor(260000 / width));
+        pixelCount <= INITIAL_SYNC_PIXEL_LIMIT && maxIterations <= INITIAL_SYNC_ITERATION_LIMIT
+          ? height
+          : Math.max(4, Math.floor(ROW_PIXEL_BUDGET / width));
       var palette = paletteFns[paletteSelect.value] || paletteFns.aurora;
 
       status.textContent = "Rendering";
@@ -129,14 +152,14 @@
     paletteSelect.addEventListener("change", scheduleRender);
     detailRange.addEventListener("input", scheduleRender);
     zoomIn.addEventListener("click", function () {
-      zoom(0.58);
+      zoom(ZOOM_IN_FACTOR);
     });
     zoomOut.addEventListener("click", function () {
-      zoom(1.72);
+      zoom(ZOOM_OUT_FACTOR);
     });
     reset.addEventListener("click", function () {
       view = Object.assign({}, INITIAL_VIEW);
-      detailRange.value = "192";
+      detailRange.value = DEFAULT_DETAIL;
       paletteSelect.value = "aurora";
       scheduleRender();
     });
@@ -148,12 +171,12 @@
 
       view.centerX += x * view.scale * aspect;
       view.centerY += y * view.scale;
-      view.scale *= 0.78;
+      view.scale *= CLICK_ZOOM_FACTOR;
       scheduleRender();
     });
     window.addEventListener("resize", function () {
       window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(scheduleRender, 120);
+      resizeTimer = window.setTimeout(scheduleRender, RESIZE_DEBOUNCE_MS);
     });
 
     scheduleRender();

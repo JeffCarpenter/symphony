@@ -16,7 +16,7 @@ defmodule SymphonyElixirWeb.Layouts do
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="csrf-token" content={@csrf_token} />
-        <title>Symphony Observability</title>
+        <title>Mandelbrot Explorer</title>
         <script defer src="/vendor/phoenix_html/phoenix_html.js"></script>
         <script defer src="/vendor/phoenix/phoenix.js"></script>
         <script defer src="/vendor/phoenix_live_view/phoenix_live_view.js"></script>
@@ -37,6 +37,7 @@ defmodule SymphonyElixirWeb.Layouts do
           });
         </script>
         <link rel="stylesheet" href="/dashboard.css" />
+        <script defer src="/mandelbrot.js"></script>
       </head>
       <body>
         {@inner_content}

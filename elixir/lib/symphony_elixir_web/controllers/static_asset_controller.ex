@@ -11,6 +11,12 @@ defmodule SymphonyElixirWeb.StaticAssetController do
   @spec dashboard_css(Conn.t(), map()) :: Conn.t()
   def dashboard_css(conn, _params), do: serve(conn, "/dashboard.css")
 
+  @spec mandelbrot_js(Conn.t(), map()) :: Conn.t()
+  def mandelbrot_js(conn, _params), do: serve(conn, "/mandelbrot.js")
+
+  @spec mandelbrot_preview(Conn.t(), map()) :: Conn.t()
+  def mandelbrot_preview(conn, _params), do: serve(conn, "/mandelbrot-preview.png")
+
   @spec phoenix_html_js(Conn.t(), map()) :: Conn.t()
   def phoenix_html_js(conn, _params), do: serve(conn, "/vendor/phoenix_html/phoenix_html.js")
 

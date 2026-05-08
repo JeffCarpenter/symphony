@@ -34,6 +34,12 @@ help with the setup:
 > Set up Symphony for my repository based on
 > https://github.com/openai/symphony/blob/main/elixir/README.md
 
+## Deployment
+
+This repository includes a small static project page under [`docs/pages`](docs/pages). The
+[`deploy-pages`](.github/workflows/deploy-pages.yml) workflow publishes that page to GitHub Pages
+from `main` and can also be run manually from GitHub Actions.
+
 ---
 
 ## License

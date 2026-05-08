@@ -477,7 +477,7 @@ defmodule SymphonyElixir.ExtensionsTest do
              }
   end
 
-  test "dashboard bootstraps liveview from embedded static assets" do
+  test "mandelbrot view bootstraps liveview from embedded static assets" do
     orchestrator_name = Module.concat(__MODULE__, :AssetOrchestrator)
 
     {:ok, _pid} =
@@ -496,17 +496,28 @@ defmodule SymphonyElixir.ExtensionsTest do
 
     html = html_response(get(build_conn(), "/"), 200)
     assert html =~ "/dashboard.css"
+    assert html =~ "/mandelbrot.js"
     assert html =~ "/vendor/phoenix_html/phoenix_html.js"
     assert html =~ "/vendor/phoenix/phoenix.js"
     assert html =~ "/vendor/phoenix_live_view/phoenix_live_view.js"
     refute html =~ "/assets/app.js"
     refute html =~ "<style>"
+    assert html =~ "Mandelbrot Set"
+    assert html =~ "mandelbrot-canvas"
 
     dashboard_css = response(get(build_conn(), "/dashboard.css"), 200)
     assert dashboard_css =~ ":root {"
-    assert dashboard_css =~ ".status-badge-live"
-    assert dashboard_css =~ "[data-phx-main].phx-connected .status-badge-live"
-    assert dashboard_css =~ "[data-phx-main].phx-connected .status-badge-offline"
+    assert dashboard_css =~ ".fractal-stage"
+    assert dashboard_css =~ ".fractal-canvas"
+    assert dashboard_css =~ "/mandelbrot-preview.png"
+    assert dashboard_css =~ "linear-gradient(90deg, var(--green), var(--gold), var(--rose), var(--violet))"
+
+    mandelbrot_js = response(get(build_conn(), "/mandelbrot.js"), 200)
+    assert mandelbrot_js =~ "function mandelbrotColor"
+    assert mandelbrot_js =~ "requestAnimationFrame"
+
+    mandelbrot_preview = response(get(build_conn(), "/mandelbrot-preview.png"), 200)
+    assert byte_size(mandelbrot_preview) > 1_000
 
     phoenix_html_js = response(get(build_conn(), "/vendor/phoenix_html/phoenix_html.js"), 200)
     assert phoenix_html_js =~ "phoenix.link.click"
@@ -520,14 +531,13 @@ defmodule SymphonyElixir.ExtensionsTest do
     assert live_view_js =~ "var LiveView = (() => {"
   end
 
-  test "dashboard liveview renders and refreshes over pubsub" do
+  test "mandelbrot liveview renders visualization controls" do
     orchestrator_name = Module.concat(__MODULE__, :DashboardOrchestrator)
-    snapshot = static_snapshot()
 
-    {:ok, orchestrator_pid} =
+    {:ok, _orchestrator_pid} =
       StaticOrchestrator.start_link(
         name: orchestrator_name,
-        snapshot: snapshot,
+        snapshot: static_snapshot(),
         refresh: %{
           queued: true,
           coalesced: true,
@@ -538,73 +548,31 @@ defmodule SymphonyElixir.ExtensionsTest do
 
     start_test_endpoint(orchestrator: orchestrator_name, snapshot_timeout_ms: 50)
 
-    {:ok, view, html} = live(build_conn(), "/")
-    assert html =~ "Operations Dashboard"
-    assert html =~ "MT-HTTP"
-    assert html =~ "MT-RETRY"
-    assert html =~ "rendered"
-    assert html =~ "Runtime"
-    assert html =~ "Live"
-    assert html =~ "Offline"
-    assert html =~ "Copy ID"
-    assert html =~ "Codex update"
+    {:ok, _view, html} = live(build_conn(), "/")
+    assert html =~ "Mandelbrot Explorer"
+    assert html =~ "Mandelbrot Set"
+    assert html =~ "mandelbrot-app"
+    assert html =~ "mandelbrot-canvas"
+    assert html =~ "palette-select"
+    assert html =~ "detail-range"
+    assert html =~ "Zoom in"
+    assert html =~ "Zoom out"
+    assert html =~ "Reset"
     refute html =~ "data-runtime-clock="
     refute html =~ "setInterval(refreshRuntimeClocks"
     refute html =~ "Refresh now"
     refute html =~ "Transport"
-    assert html =~ "status-badge-live"
-    assert html =~ "status-badge-offline"
-
-    updated_snapshot =
-      put_in(snapshot.running, [
-        %{
-          issue_id: "issue-http",
-          identifier: "MT-HTTP",
-          state: "In Progress",
-          session_id: "thread-http",
-          turn_count: 8,
-          last_codex_event: :notification,
-          last_codex_message: %{
-            event: :notification,
-            message: %{
-              payload: %{
-                "method" => "codex/event/agent_message_content_delta",
-                "params" => %{
-                  "msg" => %{
-                    "content" => "structured update"
-                  }
-                }
-              }
-            }
-          },
-          last_codex_timestamp: DateTime.utc_now(),
-          codex_input_tokens: 10,
-          codex_output_tokens: 12,
-          codex_total_tokens: 22,
-          started_at: DateTime.utc_now()
-        }
-      ])
-
-    :sys.replace_state(orchestrator_pid, fn state ->
-      Keyword.put(state, :snapshot, updated_snapshot)
-    end)
-
-    StatusDashboard.notify_update()
-
-    assert_eventually(fn ->
-      render(view) =~ "agent message content streaming: structured update"
-    end)
   end
 
-  test "dashboard liveview renders an unavailable state without crashing" do
+  test "mandelbrot liveview renders without an orchestrator" do
     start_test_endpoint(
       orchestrator: Module.concat(__MODULE__, :MissingDashboardOrchestrator),
       snapshot_timeout_ms: 5
     )
 
     {:ok, _view, html} = live(build_conn(), "/")
-    assert html =~ "Snapshot unavailable"
-    assert html =~ "snapshot_unavailable"
+    assert html =~ "Mandelbrot Set"
+    assert html =~ "Colorized Mandelbrot fractal"
   end
 
   test "http server serves embedded assets, accepts form posts, and rejects invalid hosts" do
@@ -646,6 +614,15 @@ defmodule SymphonyElixir.ExtensionsTest do
     dashboard_css = Req.get!("http://127.0.0.1:#{port}/dashboard.css")
     assert dashboard_css.status == 200
     assert dashboard_css.body =~ ":root {"
+    assert dashboard_css.body =~ ".fractal-canvas"
+
+    mandelbrot_js = Req.get!("http://127.0.0.1:#{port}/mandelbrot.js")
+    assert mandelbrot_js.status == 200
+    assert mandelbrot_js.body =~ "mandelbrotColor"
+
+    mandelbrot_preview = Req.get!("http://127.0.0.1:#{port}/mandelbrot-preview.png")
+    assert mandelbrot_preview.status == 200
+    assert byte_size(mandelbrot_preview.body) > 1_000
 
     phoenix_js = Req.get!("http://127.0.0.1:#{port}/vendor/phoenix/phoenix.js")
     assert phoenix_js.status == 200
